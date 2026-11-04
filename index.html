@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2F3C8F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Голодание">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Окно голодания</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@400;600&display=swap">
+<style>
+/* Layout: one column phone app, ring timer on top, tab bar at bottom; night indigo = голодание, amber = окно питания */
+:root{
+  --bg:#EEF1EC; --surface:#FAFBF8; --ink:#16211C; --muted:#5F6B65; --line:#D5DBD3;
+  --fast:#2F3C8F; --fast-soft:#DCE0F3; --eat:#C9851C; --eat-soft:#F5E6C8; --ok:#2F7D55;
+  --display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --body:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1412; --surface:#171E1B; --ink:#E7ECE8; --muted:#94A19A; --line:#2A3430;
+  --fast:#8E9BF0; --fast-soft:#232A4D; --eat:#E8AE4E; --eat-soft:#3A2E17; --ok:#62C08C; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1412; --surface:#171E1B; --ink:#E7ECE8; --muted:#94A19A; --line:#2A3430;
+  --fast:#8E9BF0; --fast-soft:#232A4D; --eat:#E8AE4E; --eat-soft:#3A2E17; --ok:#62C08C; color-scheme:dark}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px)}
+body{margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.app{max-width:480px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px calc(88px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px}
+header{display:flex;justify-content:space-between;align-items:baseline;padding-top:4px}
+h1{font-family:var(--display);font-weight:600;font-size:18px;margin:0;letter-spacing:-.01em}
+.date{color:var(--muted);font-size:13px}
+h2{font-family:var(--display);font-weight:400;font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:0;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.ringwrap{position:relative;width:min(300px,78vw);aspect-ratio:1;max-width:100%;margin:4px auto 0}
+.ringwrap svg{width:100%;height:100%;transform:rotate(-90deg)}
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:2px}
+.state{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.state.fast{color:var(--fast)} .state.eat{color:var(--eat)}
+.clock{font-family:var(--display);font-size:clamp(30px,10vw,40px);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.times{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.times div{display:flex;flex-direction:column;gap:2px}
+.times span{font-size:12px;color:var(--muted)}
+.times b{font-weight:600;font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer;border:0;border-radius:999px;padding:13px 18px;font-weight:600}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--fast);outline-offset:2px}
+.primary{background:var(--fast);color:var(--surface);width:100%;font-size:16px}
+.primary.end{background:var(--eat)}
+.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);padding:8px 14px;font-weight:500;font-size:13px}
+.plans{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.plan{flex:0 0 auto;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:14px;padding:10px 14px;text-align:left;font-weight:500}
+.plan b{display:block;font-family:var(--display);font-weight:600;font-size:16px}
+.plan small{color:var(--muted);font-size:11px}
+.plan[aria-pressed="true"]{border-color:var(--fast);background:var(--fast-soft)}
+.stages{display:flex;flex-direction:column;gap:0;list-style:none;margin:0;padding:0}
+.stages li{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--line);opacity:.55}
+.stages li:first-child{border-top:0}
+.stages li.done{opacity:1}
+.stages li.now{opacity:1}
+.stages .h{font-family:var(--display);font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.stages li.done .h,.stages li.now .h{color:var(--fast)}
+.stages strong{display:block;font-weight:600}
+.stages p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.stages li.now strong::after{content:" · сейчас";color:var(--fast);font-weight:500;font-size:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input,select{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.water{display:flex;gap:6px;flex-wrap:wrap}
+.glass{width:30px;height:38px;border-radius:4px 4px 9px 9px;border:2px solid var(--fast);background:transparent;padding:0;position:relative;overflow:hidden}
+.glass.full::after{content:"";position:absolute;inset:auto 0 0 0;height:78%;background:var(--fast);opacity:.75}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--bg);border-radius:12px;padding:10px}
+.stat b{display:block;font-family:var(--display);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.bars{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end;height:120px}
+.bar{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.bar i{display:block;width:100%;max-width:28px;border-radius:6px 6px 2px 2px;background:var(--fast-soft);min-height:3px}
+.bar i.hit{background:var(--fast)}
+.bar span{font-size:11px;color:var(--muted)}
+.chart{width:100%;height:auto;display:block}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;justify-content:space-between;gap:8px;padding:9px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.list li:first-child{border-top:0}
+.list .x{background:none;border:0;color:var(--muted);padding:0 4px;font-weight:400}
+.empty{color:var(--muted);font-size:14px;margin:0}
+.ok{color:var(--ok)}
+.note{font-size:12px;color:var(--muted);margin:0}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);z-index:5}
+nav .in{display:grid;grid-template-columns:repeat(3,1fr);width:100%;max-width:480px}
+nav button{background:none;border-radius:0;padding:14px 4px;color:var(--muted);font-weight:500;font-size:13px}
+nav button[aria-current="true"]{color:var(--fast);font-weight:600}
+.confirm{display:flex;gap:8px}
+.confirm button{flex:1}
+.danger{background:var(--eat-soft);color:var(--ink)}
+.sync{font-size:11px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:no-preference){#prog{transition:stroke-dashoffset .6s ease}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>Окно голодания</h1><span class="date" id="today"></span></header>
+
+  <section id="v-timer" style="display:flex;flex-direction:column;gap:16px">
+    <div class="card">
+      <div class="ringwrap">
+        <svg viewBox="0 0 220 220" aria-hidden="true">
+          <circle cx="110" cy="110" r="96" fill="none" stroke="var(--line)" stroke-width="14"/>
+          <circle id="prog" cx="110" cy="110" r="96" fill="none" stroke="var(--fast)" stroke-width="14" stroke-linecap="round" stroke-dasharray="603.19" stroke-dashoffset="603.19"/>
+          <g id="ticks"></g>
+        </svg>
+        <div class="center">
+          <span class="state" id="state">Окно питания</span>
+          <span class="clock" id="clock">00:00:00</span>
+          <span class="sub" id="sub">выберите план и начните</span>
+        </div>
+      </div>
+      <div class="times">
+        <div><span>Начало</span><b id="tStart">—</b></div>
+        <div><span>Цель</span><b id="tEnd">—</b></div>
+      </div>
+      <div id="actions"></div>
+      <div class="row" id="editStart" hidden>
+        <label for="startInput" class="note">Начала раньше? Укажите время:</label>
+        <input type="datetime-local" id="startInput">
+        <button class="ghost" id="saveStart">Сохранить</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>План</h2>
+      <div class="plans" id="plans"></div>
+    </div>
+
+    <div class="card">
+      <h2>Вода сегодня</h2>
+      <div class="water" id="water"></div>
+      <p class="note" id="waterNote"></p>
+    </div>
+
+    <div class="card">
+      <h2>Стадии голодания</h2>
+      <ol class="stages" id="stages"></ol>
+      <p class="note">Часы условные: у каждого человека стадии наступают по-разному. Приложение не заменяет консультацию врача.</p>
+    </div>
+  </section>
+
+  <section id="v-stats" hidden style="flex-direction:column;gap:16px">
+    <div class="card">
+      <h2>Итоги</h2>
+      <div class="stats">
+        <div class="stat"><b id="sCount">0</b><span>голоданий</span></div>
+        <div class="stat"><b id="sAvg">0</b><span>ч в среднем</span></div>
+        <div class="stat"><b id="sStreak">0</b><span>дней подряд</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Последние 7 дней, часы</h2>
+      <div class="bars" id="bars"></div>
+    </div>
+    <div class="card">
+      <h2>История</h2>
+      <ul class="list" id="hist"></ul>
+    </div>
+  </section>
+
+  <section id="v-body" hidden style="flex-direction:column;gap:16px">
+    <div class="card">
+      <h2>Вес</h2>
+      <form class="row" id="wForm">
+        <input type="number" id="wInput" step="0.1" min="20" max="400" inputmode="decimal" placeholder="кг" style="flex:1">
+        <button class="primary" style="width:auto">Записать</button>
+      </form>
+      <div id="wChart"></div>
+      <ul class="list" id="wList"></ul>
+    </div>
+    <div class="card">
+      <h2>Цели</h2>
+      <div class="row"><label for="wGoal" style="flex:1">Целевой вес, кг</label><input type="number" id="wGoal" step="0.1" style="width:110px"></div>
+      <div class="row"><label for="waterGoal" style="flex:1">Стаканов воды (250 мл)</label><input type="number" id="waterGoal" min="1" max="16" style="width:110px"></div>
+    </div>
+    <p class="sync" id="sync"></p>
+  </section>
+</div>
+
+<nav><div class="in">
+  <button data-v="timer" aria-current="true">Таймер</button>
+  <button data-v="stats">Статистика</button>
+  <button data-v="body">Вес и цели</button>
+</div></nav>
+
+<script>
+const PLANS=[
+  {id:"13:11",h:13,t:"Мягкий старт"},
+  {id:"14:10",h:14,t:"Новичкам"},
+  {id:"16:8",h:16,t:"Самый популярный"},
+  {id:"18:6",h:18,t:"Продвинутый"},
+  {id:"20:4",h:20,t:"Воин"},
+  {id:"23:1",h:23,t:"Раз в день"}
+];
+const STAGES=[
+  [0,"Пищеварение","Организм усваивает последний приём пищи, уровень сахара и инсулина повышен."],
+  [4,"Снижение сахара","Сахар и инсулин возвращаются к исходному уровню."],
+  [8,"Расход гликогена","Организм использует запасы гликогена в печени."],
+  [12,"Переход на жиры","Запасы гликогена истощаются, растёт доля энергии из жира."],
+  [16,"Кетоз","Печень активнее вырабатывает кетоновые тела."],
+  [18,"Аутофагия","По данным исследований, процессы клеточного обновления усиливаются."],
+  [24,"Глубокий кетоз","Длительное голодание – только по согласованию с врачом."]
+];
+const DEF={plan:"16:8",active:null,history:[],weights:[],water:{},waterGoal:8,weightGoal:null};
+let S=structuredClone(DEF);
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,"0");
+const dayKey=d=>{d=new Date(d);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};
+const fmtT=t=>{const d=new Date(t);const today=dayKey(Date.now())===dayKey(d);return (today?"сегодня ":d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+" ")+pad(d.getHours())+":"+pad(d.getMinutes())};
+const hrs=ms=>ms/36e5;
+
+function load(){try{const r=localStorage.getItem("fastapp");if(r)S={...DEF,...JSON.parse(r)}}catch(e){}}
+function save(){
+  try{localStorage.setItem("fastapp",JSON.stringify(S))}catch(e){}
+  render();
+}
+
+/* plans */
+function renderPlans(){
+  $("plans").innerHTML="";
+  PLANS.forEach(p=>{const b=document.createElement("button");b.className="plan";b.type="button";b.setAttribute("aria-pressed",S.plan===p.id);
+    b.innerHTML="<b>"+p.id+"</b><small>"+p.t+"</small>";
+    b.onclick=()=>{S.plan=p.id;if(S.active)S.active.goalH=p.h;save()};$("plans").appendChild(b)});
+}
+const planH=()=>(PLANS.find(p=>p.id===S.plan)||PLANS[2]).h;
+
+/* ring ticks */
+function renderTicks(goal){
+  const g=$("ticks");g.innerHTML="";
+  STAGES.forEach(([h])=>{if(h===0||h>goal)return;const a=h/goal*2*Math.PI;
+    const c=document.createElementNS("http://www.w3.org/2000/svg","circle");
+    c.setAttribute("cx",110+96*Math.cos(a));c.setAttribute("cy",110+96*Math.sin(a));c.setAttribute("r",3.5);
+    c.setAttribute("fill","var(--surface)");c.setAttribute("stroke","var(--fast)");c.setAttribute("stroke-width","1.5");g.appendChild(c)});
+}
+
+let confirmEnd=false;
+function renderTimer(){
+  const now=Date.now(), C=603.19, a=S.active;
+  if(a){
+    const el=now-a.start, goal=a.goalH*36e5, frac=Math.min(el/goal,1);
+    $("state").textContent=el>=goal?"Цель достигнута":"Голодание";$("state").className="state fast";
+    const s=Math.floor(el/1000);$("clock").textContent=pad(Math.floor(s/3600))+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60);
+    const left=goal-el;
+    $("sub").textContent=left>0?("осталось "+Math.floor(left/36e5)+" ч "+pad(Math.floor(left%36e5/6e4))+" мин"):("сверх цели "+Math.floor(-left/36e5)+" ч "+pad(Math.floor(-left%36e5/6e4))+" мин");
+    $("prog").style.strokeDashoffset=C*(1-frac);$("prog").setAttribute("stroke",el>=goal?"var(--ok)":"var(--fast)");
+    $("tStart").textContent=fmtT(a.start);$("tEnd").textContent=fmtT(a.start+goal);
+    renderTicks(a.goalH);
+  }else{
+    const last=S.history[S.history.length-1];
+    $("state").textContent="Окно питания";$("state").className="state eat";
+    if(last){const s=Math.floor((now-last.end)/1000);$("clock").textContent=pad(Math.floor(s/3600))+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60);
+      const eatH=24-last.goalH, left=eatH*36e5-(now-last.end);
+      $("sub").textContent=left>0?"до следующего голодания "+Math.floor(left/36e5)+" ч "+pad(Math.floor(left%36e5/6e4))+" мин":"пора начинать голодание";
+    }else{$("clock").textContent="00:00:00";$("sub").textContent="план "+S.plan+" · нажмите «Начать»"}
+    $("prog").style.strokeDashoffset=C;$("tStart").textContent="—";$("tEnd").textContent=planH()+" ч после старта";
+    $("ticks").innerHTML="";
+  }
+}
+function renderActions(){
+  const box=$("actions");box.innerHTML="";
+  if(!S.active){const b=document.createElement("button");b.className="primary";b.textContent="Начать голодание "+S.plan;
+    b.onclick=()=>{S.active={start:Date.now(),goalH:planH()};save()};box.appendChild(b);$("editStart").hidden=true;return}
+  if(confirmEnd){const w=document.createElement("div");w.className="confirm";
+    const y=document.createElement("button");y.className="primary end";y.textContent="Да, завершить";
+    y.onclick=()=>{S.history.push({start:S.active.start,end:Date.now(),goalH:S.active.goalH});S.active=null;confirmEnd=false;save()};
+    const n=document.createElement("button");n.className="danger";n.textContent="Продолжить";n.onclick=()=>{confirmEnd=false;renderActions()};
+    w.append(y,n);box.appendChild(w)}
+  else{const b=document.createElement("button");b.className="primary end";b.textContent="Завершить голодание";
+    b.onclick=()=>{const el=Date.now()-S.active.start;if(el<S.active.goalH*36e5){confirmEnd=true;renderActions()}else{S.history.push({start:S.active.start,end:Date.now(),goalH:S.active.goalH});S.active=null;save()}};
+    box.appendChild(b)}
+  $("editStart").hidden=false;
+  const d=new Date(S.active.start);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());$("startInput").value=d.toISOString().slice(0,16);
+}
+$("saveStart").onclick=()=>{const v=$("startInput").value;if(!v||!S.active)return;const t=new Date(v).getTime();if(t<Date.now()){S.active.start=t;save()}};
+
+function renderStages(){
+  const el=S.active?hrs(Date.now()-S.active.start):-1;$("stages").innerHTML="";
+  STAGES.forEach(([h,t,d],i)=>{const next=STAGES[i+1]?STAGES[i+1][0]:1e9;const li=document.createElement("li");
+    if(el>=next)li.className="done";else if(el>=h)li.className="now";
+    li.innerHTML='<span class="h">'+h+' ч</span><div><strong>'+t+'</strong><p>'+d+'</p></div>';$("stages").appendChild(li)});
+}
+function renderWater(){
+  const k=dayKey(Date.now()),n=S.water[k]||0,g=S.waterGoal;$("water").innerHTML="";
+  for(let i=0;i<Math.max(g,n);i++){const b=document.createElement("button");b.type="button";b.className="glass"+(i<n?" full":"");
+    b.setAttribute("aria-label","Стакан "+(i+1));b.onclick=()=>{S.water[k]=(i<n&&i===n-1)?n-1:i+1;save()};$("water").appendChild(b)}
+  $("waterNote").innerHTML=n>=g?'<span class="ok">Норма выполнена: '+(n*0.25).toFixed(2).replace(".",",")+" л</span>":(n*0.25).toFixed(2).replace(".",",")+" л из "+(g*0.25).toFixed(2).replace(".",",")+" л · нажмите на стакан";
+}
+function renderStats(){
+  const H=S.history;$("sCount").textContent=H.length;
+  $("sAvg").textContent=H.length?(H.reduce((a,f)=>a+hrs(f.end-f.start),0)/H.length).toFixed(1).replace(".",","):"0";
+  const days=new Set(H.filter(f=>hrs(f.end-f.start)>=f.goalH).map(f=>dayKey(f.end)));let st=0,d=new Date();
+  if(!days.has(dayKey(d)))d.setDate(d.getDate()-1);while(days.has(dayKey(d))){st++;d.setDate(d.getDate()-1)}$("sStreak").textContent=st;
+  const bars=$("bars");bars.innerHTML="";const dd=[];
+  for(let i=6;i>=0;i--){const x=new Date();x.setDate(x.getDate()-i);dd.push(x)}
+  const max=Math.max(24,...dd.map(x=>H.filter(f=>dayKey(f.end)===dayKey(x)).reduce((a,f)=>a+hrs(f.end-f.start),0)));
+  dd.forEach(x=>{const fs=H.filter(f=>dayKey(f.end)===dayKey(x));const h=fs.reduce((a,f)=>a+hrs(f.end-f.start),0);
+    const hit=fs.some(f=>hrs(f.end-f.start)>=f.goalH);const b=document.createElement("div");b.className="bar";
+    b.innerHTML='<i class="'+(hit?"hit":"")+'" style="height:'+(h/max*100)+'%" title="'+h.toFixed(1)+' ч"></i><span>'+x.toLocaleDateString("ru-RU",{weekday:"short"})+'</span>';bars.appendChild(b)});
+  const ul=$("hist");ul.innerHTML="";
+  if(!H.length){ul.innerHTML='<li class="empty">Завершённые голодания появятся здесь.</li>';return}
+  H.slice().reverse().slice(0,30).forEach((f,ri)=>{const idx=H.length-1-ri;const h=hrs(f.end-f.start);const li=document.createElement("li");
+    li.innerHTML='<span>'+new Date(f.end).toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+' · план '+f.goalH+' ч</span><span><b class="'+(h>=f.goalH?"ok":"")+'">'+Math.floor(h)+' ч '+pad(Math.round(h%1*60))+' мин</b> <button class="x" aria-label="Удалить">×</button></span>';
+    li.querySelector(".x").onclick=()=>{S.history.splice(idx,1);save()};ul.appendChild(li)});
+}
+function renderWeight(){
+  const W=S.weights.slice().sort((a,b)=>a.t-b.t),box=$("wChart");
+  if($("wGoal")!==document.activeElement)$("wGoal").value=S.weightGoal??"";
+  if($("waterGoal")!==document.activeElement)$("waterGoal").value=S.waterGoal;
+  if(W.length<2){box.innerHTML='<p class="empty">'+(W.length?"Добавьте ещё одно измерение, чтобы увидеть график.":"Запишите вес, чтобы отслеживать динамику.")+'</p>'}
+  else{
+    const vals=W.map(w=>w.kg).concat(S.weightGoal?[S.weightGoal]:[]);let lo=Math.floor(Math.min(...vals)-1),hi=Math.ceil(Math.max(...vals)+1);
+    const Wd=320,Hd=150,L=34,R=10,T=10,B=22,x=i=>L+i*(Wd-L-R)/(W.length-1),y=v=>T+(hi-v)/(hi-lo)*(Hd-T-B);
+    let g="";const step=Math.max(1,Math.round((hi-lo)/4));
+    for(let v=lo;v<=hi;v+=step)g+='<line x1="'+L+'" x2="'+(Wd-R)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line)"/><text x="'+(L-6)+'" y="'+(y(v)+4)+'" text-anchor="end" font-size="10" fill="var(--muted)">'+v+'</text>';
+    if(S.weightGoal)g+='<line x1="'+L+'" x2="'+(Wd-R)+'" y1="'+y(S.weightGoal)+'" y2="'+y(S.weightGoal)+'" stroke="var(--ok)" stroke-dasharray="4 4"/>';
+    const pts=W.map((w,i)=>x(i)+","+y(w.kg)).join(" ");
+    g+='<polygon points="'+L+','+(Hd-B)+' '+pts+' '+x(W.length-1)+','+(Hd-B)+'" fill="var(--fast-soft)" opacity=".7"/>';
+    g+='<polyline points="'+pts+'" fill="none" stroke="var(--fast)" stroke-width="2"/>';
+    const lx=x(W.length-1),ly=y(W[W.length-1].kg);g+='<circle cx="'+lx+'" cy="'+ly+'" r="4" fill="var(--fast)"/>';
+    g+='<text x="'+L+'" y="'+(Hd-6)+'" font-size="10" fill="var(--muted)">'+new Date(W[0].t).toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+'</text><text x="'+(Wd-R)+'" y="'+(Hd-6)+'" text-anchor="end" font-size="10" fill="var(--muted)">'+new Date(W[W.length-1].t).toLocaleDateString("ru-RU",{day:"numeric",month:"short"})+'</text>';
+    const diff=W[W.length-1].kg-W[0].kg;
+    box.innerHTML='<p class="note">Изменение: <b>'+(diff>0?"+":"")+diff.toFixed(1).replace(".",",")+' кг</b>'+(S.weightGoal?' · до цели '+Math.abs(W[W.length-1].kg-S.weightGoal).toFixed(1).replace(".",",")+' кг':'')+'</p><svg class="chart" viewBox="0 0 '+Wd+' '+Hd+'" role="img" aria-label="График веса">'+g+'</svg>';
+  }
+  const ul=$("wList");ul.innerHTML="";
+  W.slice().reverse().slice(0,10).forEach(w=>{const li=document.createElement("li");
+    li.innerHTML='<span>'+new Date(w.t).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})+'</span><span><b>'+w.kg.toFixed(1).replace(".",",")+' кг</b> <button class="x" aria-label="Удалить">×</button></span>';
+    li.querySelector(".x").onclick=()=>{S.weights=S.weights.filter(z=>z!==w);save()};ul.appendChild(li)});
+}
+$("wForm").onsubmit=e=>{e.preventDefault();const v=parseFloat($("wInput").value.replace(",","."));if(!(v>20&&v<400))return;
+  const k=dayKey(Date.now());S.weights=S.weights.filter(w=>dayKey(w.t)!==k);S.weights.push({t:Date.now(),kg:v});$("wInput").value="";save()};
+$("wGoal").onchange=()=>{const v=parseFloat($("wGoal").value);S.weightGoal=v>0?v:null;save()};
+$("waterGoal").onchange=()=>{const v=parseInt($("waterGoal").value);if(v>0&&v<=16){S.waterGoal=v;save()}};
+
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-current",x===b));
+  ["timer","stats","body"].forEach(v=>{const s=$("v-"+v);s.hidden=v!==b.dataset.v;if(!s.hidden)s.style.display="flex"});
+  scrollTo(0,0)});
+
+function render(){
+  $("today").textContent=new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"});
+  renderPlans();renderTimer();renderActions();renderStages();renderWater();renderStats();renderWeight();
+}
+load();render();
+setInterval(()=>{renderTimer();if(S.active&&Date.now()%60000<1000)renderStages()},1000);
+setInterval(renderStages,60000);
+$("sync").textContent="Данные хранятся на этом устройстве";
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
